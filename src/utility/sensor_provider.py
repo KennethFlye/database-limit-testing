@@ -8,7 +8,6 @@ from schemas.gateway import Gateway
 import line_profiler
 
 class SensorProvider(BaseProvider):
-    @profile
     def data_specific(self, fake) -> Data:
         #fake = Faker()
         dr = fake.bothify(text='??# ??### #/#').upper()
@@ -37,7 +36,7 @@ class SensorProvider(BaseProvider):
         port = 2
         seqno = fake.random_int(min=1000000, max=9999999)
         return Data(dr, ts, EUI, ack, bat, cmd, gws, toa, data, fcnt, freq, port, seqno)
-    @profile
+
     def data(self, fake) -> SensorData:
         #fake = Faker()
         id = fake.uuid4()
