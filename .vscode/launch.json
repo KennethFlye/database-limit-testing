@@ -11,9 +11,8 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "env": {
-                "DATA_POINTS": "100000",
-                "POOLS": "5",
-                "QUERY": "1"
+                "DATA_POINTS": "10000",
+                "POOLS": "10",
             }
         }
     ]
