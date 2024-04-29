@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: script-deployment
+  labels:
+    app: database-script
+spec:
+  replicas: 4
+  selector:
+    matchLabels:
+      app: database-script
+  template:
+    metadata:
+      labels:
+        app: database-script
+    spec:
+      containers:
+        - name: database-script
+          image: kennethflye/sensade:local-database-write-script
+          imagePullPolicy: Always
+      imagePullSecrets:
+        - name: regcred

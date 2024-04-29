@@ -5,11 +5,12 @@ import jsonpickle
 from utility.sensor_provider import SensorProvider
 from schemas.test_result import TestResult
 import time
-from multiprocessing import Pool
+from multiprocessing import Pool, cpu_count
 import os
 import pika
 import redis
 import uuid
+import random
 from itertools import repeat
 
 def run(amount_write, amount_pools, run_id, script_id):
@@ -136,6 +137,8 @@ def get_insert_queries_for_pool(amount: int) -> list:
 
     fake = Faker()
     fake.add_provider(SensorProvider)
+    random_float = random.random()
+    fake.seed_instance(random_float)
 
     for x in range(amount):
         data_object = fake.data(fake)
@@ -161,8 +164,16 @@ def queries_to_file(amount_write: int, amount_pools: int):
                 file.write(query + "\n")
 
 def setup_mq_connection():
+    config = configparser.ConfigParser()
+
+    config.read(r'src/config/settings/config.ini')
+
+    mq_server_host = config.get("MQ", "mq_server_host")
+
+    print(mq_server_host)
+
     connection = pika.BlockingConnection(
-    pika.ConnectionParameters(host='localhost'))
+    pika.ConnectionParameters(host=mq_server_host))
     channel = connection.channel()
 
     channel.exchange_declare(exchange='write', exchange_type='fanout')
@@ -209,27 +220,44 @@ def clear_sensor_table():
     conn.commit()
 
 def setup_redis_connection():
-    return redis.Redis(host='localhost', port=6379, decode_responses=True)
+    config = configparser.ConfigParser()
+
+    config.read(r'src/config/settings/config.ini')
+
+    redis_server_host = config.get("Redis", "redis_server_host")
+
+    return redis.Redis(host=redis_server_host, port=6379, decode_responses=True)
 
 if __name__ == '__main__':
     amount_write = int(os.environ.get("DATA_POINTS", 50000))
     amount_pools = int(os.environ.get("POOLS", 10))
 
-    channel, queue_name_query, queue_name_write, queue_name_clear = setup_mq_connection()
+    config = configparser.ConfigParser()
+
+    config.read(r'src/config/settings/config.ini')
+
+    mq_server_host = config.get("MQ", "mq_server_host")
+
+    print(f"CPU Amount: {cpu_count()}, {mq_server_host}")
+
     r = setup_redis_connection()
+    channel, queue_name_query, queue_name_write, queue_name_clear = setup_mq_connection()
 
     def query_callback(ch, method, properties, body):
+        print("Received Query Message")
         queries_to_file(amount_write, amount_pools)
         ch.basic_ack(delivery_tag = method.delivery_tag)
         print("Done Creating Queries")
 
     def write_callback(ch, method, properties, body):
+        print("Received Write Message")
         script_id = str(uuid.uuid4())
         run(amount_write, amount_pools, body.decode("utf-8"), script_id)
         ch.basic_ack(delivery_tag = method.delivery_tag)
         print("Done Inserting to Database")
 
     def clear_callback(ch, method, properties, body):
+        print("Received Clear Message")
         clear_sensor_table()
         ch.basic_ack(delivery_tag = method.delivery_tag)
         print("Done Clearing Sensor Table")
