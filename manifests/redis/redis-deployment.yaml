@@ -2,16 +2,17 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: redis
+  namespace: database-test-script
   labels:
-    app: redis
+    name: redis
 spec:
   selector:
     matchLabels:
-      app: redis
+      name: redis
   template:
     metadata:
       labels:
-        app: redis
+        name: redis
     spec:
       containers:
         - name: redis

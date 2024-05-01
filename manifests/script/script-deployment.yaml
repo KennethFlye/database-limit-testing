@@ -2,21 +2,50 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: script-deployment
+  namespace: database-test-script
   labels:
-    app: database-script
+    name: database-script
 spec:
-  replicas: 4
+  replicas: 40
   selector:
     matchLabels:
-      app: database-script
+      name: database-script
   template:
     metadata:
       labels:
-        app: database-script
+        name: database-script
     spec:
       containers:
         - name: database-script
           image: kennethflye/sensade:local-database-write-script
-          imagePullPolicy: Always
+          env:
+            - name: DATA_POINTS
+              value: "25000"
+            - name: POOLS
+              value: "4"
+            - name: DATABASE
+              value: "sensade"
+            - name: DATABASE_USER
+              valueFrom:
+                secretKeyRef:
+                  name: database-secret
+                  key: username
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: database-secret
+                  key: password
+            - name: DATABASE_HOST
+              value: "sensade-database-development.postgres.database.azure.com"
+            - name: DATABASE_PORT
+              value: "6432"
+            - name: DATABASE_TABLE
+              value: "SensorDatas2"
+            - name: MQ_USER
+              value: "default_user_cqIyfNwU6nvqu1aTKEh"
+            - name: MQ_PASSWORD
+              value: "6w66M4S1GnfbijDh24kqrM7sg7AoG5bR"
+            - name: REDIS_HOST
+              value: "redis-service.database-test-script"
       imagePullSecrets:
         - name: regcred

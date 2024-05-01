@@ -2,3 +2,4 @@ apiVersion: rabbitmq.com/v1beta1
 kind: RabbitmqCluster
 metadata:
   name: mq-database-script
+  namespace: database-test-script

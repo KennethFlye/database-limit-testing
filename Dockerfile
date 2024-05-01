@@ -1,7 +1,7 @@
 FROM python:3.9
 
 #ENV Database (Måske mere ved Kubernetes)
-ENV DATA_POINTS=1000 POOLS=10
+ENV PYTHONUNBUFFERED=1
 
 RUN mkdir ./requirements
 

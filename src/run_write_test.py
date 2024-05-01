@@ -14,21 +14,9 @@ import random
 from itertools import repeat
 
 def run(amount_write, amount_pools, run_id, script_id):
-    config = configparser.ConfigParser()
+    test_sensor_write_speed_pool_file(amount_write, amount_pools, run_id, script_id)
 
-    config.read(r'src/config/settings/config.ini')
-
-    db_database = config.get("Database", "db_database")
-    db_user = config.get("Database", "db_user")
-    db_password = config.get("Database", "db_password")
-    db_host = config.get("Database", "db_server_host")
-    db_port = config.get("Database", "db_port")
-
-    conn = psycopg2.connect(dbname=db_database, user=db_user, password=db_password, host=db_host, port=db_port)
-
-    test_sensor_write_speed_pool_file(amount_write, amount_pools, run_id, script_id, conn)
-
-def test_sensor_write_speed_pool_file(amount_write, amount_pools, run_id, script_id, conn):
+def test_sensor_write_speed_pool_file(amount_write, amount_pools, run_id, script_id):
     start_time_get_queries = time.perf_counter()
     filename = "queries.sql"
     queries = get_queries_from_file(filename)
@@ -63,6 +51,9 @@ def test_sensor_write_speed_pool_file(amount_write, amount_pools, run_id, script
     r = setup_redis_connection()
 
     r.rpush(f'time_taken_overall:{run_id}', jsonpickle.encode(test_result_overall))
+    
+    print("Done Inserting to Database")
+
 
 def split_list(queries, amount_pools):
     split_query_list = []
@@ -92,11 +83,11 @@ def insert_queries(queries: list, run_id, script_id):
 
     config.read(r'src/config/settings/config.ini')
 
-    db_database = config.get("Database", "db_database")
-    db_user = config.get("Database", "db_user")
-    db_password = config.get("Database", "db_password")
-    db_host = config.get("Database", "db_server_host")
-    db_port = config.get("Database", "db_port")
+    db_database = os.environ.get("DATABASE", config.get("Database", "db_database"))
+    db_user = os.environ.get("DATABASE_USER", config.get("Database", "db_user"))
+    db_password = os.environ.get("DATABASE_PASSWORD", config.get("Database", "db_password"))
+    db_host = os.environ.get("DATABASE_HOST", config.get("Database", "db_server_host"))
+    db_port = os.environ.get("DATABASE_PORT", config.get("Database", "db_port"))
 
     start_time = time.perf_counter()
     conn = psycopg2.connect(dbname=db_database, user=db_user, password=db_password, host=db_host, port=db_port)
@@ -140,11 +131,13 @@ def get_insert_queries_for_pool(amount: int) -> list:
     random_float = random.random()
     fake.seed_instance(random_float)
 
+    table_name = os.environ.get("DATABASE_TABLE", "SensorDatas")
+
     for x in range(amount):
         data_object = fake.data(fake)
         data_object.data = fake.data_specific(fake)
 
-        query = f'INSERT INTO \"SensorDatas\" (\"Id\", \"GatewayType\", \"Data\", \"Time\", \"WasSensorDataForSensorId\", \"DataVersion\") VALUES (\'{data_object.id}\', \'{data_object.gateway_type}\', \'{jsonpickle.encode(data_object.data, unpicklable=False)}\', \'{data_object.time}\', \'{data_object.was_sensor_data_for_sensor_id}\', \'{data_object.data_version}\')'
+        query = f'INSERT INTO \"{table_name}\" (\"Id\", \"GatewayType\", \"Data\", \"Time\", \"WasSensorDataForSensorId\", \"DataVersion\") VALUES (\'{data_object.id}\', \'{data_object.gateway_type}\', \'{jsonpickle.encode(data_object.data, unpicklable=False)}\', \'{data_object.time}\', \'{data_object.was_sensor_data_for_sensor_id}\', \'{data_object.data_version}\')'
 
         queries.append(query)
     
@@ -162,6 +155,9 @@ def queries_to_file(amount_write: int, amount_pools: int):
         with open(filename, "w") as file:
             for query in queries:
                 file.write(query + "\n")
+        
+        print("Done Creating Queries")
+        
 
 def setup_mq_connection():
     config = configparser.ConfigParser()
@@ -169,11 +165,12 @@ def setup_mq_connection():
     config.read(r'src/config/settings/config.ini')
 
     mq_server_host = config.get("MQ", "mq_server_host")
-
-    print(mq_server_host)
-
+    mq_user = os.environ.get("MQ_USER", config.get("MQ", "mq_user"))
+    mq_password = os.environ.get("MQ_PASSWORD", config.get("MQ", "mq_password"))
+    credentials = pika.PlainCredentials(mq_user, mq_password)
+    
     connection = pika.BlockingConnection(
-    pika.ConnectionParameters(host=mq_server_host))
+    pika.ConnectionParameters(host=mq_server_host, credentials=credentials))
     channel = connection.channel()
 
     channel.exchange_declare(exchange='write', exchange_type='fanout')
@@ -206,39 +203,36 @@ def clear_sensor_table():
 
     config.read(r'src/config/settings/config.ini')
 
-    db_database = config.get("Database", "db_database")
-    db_user = config.get("Database", "db_user")
-    db_password = config.get("Database", "db_password")
-    db_host = config.get("Database", "db_server_host")
-    db_port = config.get("Database", "db_port")
+    db_database = os.environ.get("DATABASE", config.get("Database", "db_database"))
+    db_user = os.environ.get("DATABASE_USER", config.get("Database", "db_user"))
+    db_password = os.environ.get("DATABASE_PASSWORD", config.get("Database", "db_password"))
+    db_host = os.environ.get("DATABASE_HOST", config.get("Database", "db_server_host"))
+    db_port = os.environ.get("DATABASE_PORT", config.get("Database", "db_port"))
 
     conn = psycopg2.connect(dbname=db_database, user=db_user, password=db_password, host=db_host, port=db_port)
 
     cursor = conn.cursor()
 
-    cursor.execute("DELETE FROM \"SensorDatas\" WHERE \"GatewayType\"=\'test\';")
+    table_name = os.environ.get("DATABASE_TABLE", "SensorDatas")
+
+    cursor.execute(f"DELETE FROM \"{table_name}\" WHERE \"GatewayType\"=\'test\';")
     conn.commit()
+
+    print("Done Clearing Sensor Table")
+
 
 def setup_redis_connection():
     config = configparser.ConfigParser()
 
     config.read(r'src/config/settings/config.ini')
 
-    redis_server_host = config.get("Redis", "redis_server_host")
+    redis_server_host = os.environ.get("REDIS_HOST", config.get("Redis", "redis_server_host"))
 
     return redis.Redis(host=redis_server_host, port=6379, decode_responses=True)
 
 if __name__ == '__main__':
     amount_write = int(os.environ.get("DATA_POINTS", 50000))
     amount_pools = int(os.environ.get("POOLS", 10))
-
-    config = configparser.ConfigParser()
-
-    config.read(r'src/config/settings/config.ini')
-
-    mq_server_host = config.get("MQ", "mq_server_host")
-
-    print(f"CPU Amount: {cpu_count()}, {mq_server_host}")
 
     r = setup_redis_connection()
     channel, queue_name_query, queue_name_write, queue_name_clear = setup_mq_connection()
@@ -247,20 +241,17 @@ if __name__ == '__main__':
         print("Received Query Message")
         queries_to_file(amount_write, amount_pools)
         ch.basic_ack(delivery_tag = method.delivery_tag)
-        print("Done Creating Queries")
 
     def write_callback(ch, method, properties, body):
         print("Received Write Message")
         script_id = str(uuid.uuid4())
         run(amount_write, amount_pools, body.decode("utf-8"), script_id)
         ch.basic_ack(delivery_tag = method.delivery_tag)
-        print("Done Inserting to Database")
 
     def clear_callback(ch, method, properties, body):
         print("Received Clear Message")
         clear_sensor_table()
         ch.basic_ack(delivery_tag = method.delivery_tag)
-        print("Done Clearing Sensor Table")
 
     channel.basic_consume(
         queue=queue_name_query, on_message_callback=query_callback
